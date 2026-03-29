@@ -260,6 +260,9 @@
         "measure_power_factor"
       ],
       "capabilitiesOptions": {
+        "measure_power": {
+          "approximated": true
+        },
         "measure_temperature": {
           "decimals": 1,
           "title": {
@@ -345,7 +348,7 @@
                 "en": "IP address to NUT server.",
                 "sv": "IP adress till NUT servern."
               },
-              "value": "-"
+              "value": ""
             },
             {
               "id": "port",
@@ -373,7 +376,7 @@
                 "en": "Username to NUT server.",
                 "sv": "Användarnamn till NUT servern."
               },
-              "value": "-"
+              "value": ""
             },
             {
               "id": "password",
@@ -386,7 +389,7 @@
                 "en": "Password to NUT server.",
                 "sv": "Lösenord till NUT servern."
               },
-              "value": "-"
+              "value": ""
             },
             {
               "id": "interval",

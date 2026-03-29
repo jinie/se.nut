@@ -1,8 +1,8 @@
 'use strict';
 
 const { Device } = require('homey');
-const { parseUPSStatus } = require('../../lib/Utils');
 const Nut = require('node-nut');
+const { parseUPSStatus } = require('../../lib/Utils');
 
 class UPSDevice extends Device {
 
@@ -39,30 +39,29 @@ class UPSDevice extends Device {
 
     return new Promise((resolve, reject) => {
       const onReady = () => {
-        nut.SetUsername(this.getSetting('username'), (err) => {
-          if (err) {
-            this.log('SetUsername error:', err);
+        this.authenticate(nut, (authErr) => {
+          if (authErr) {
+            this.log('Authentication error:', authErr);
+            nut.close();
+            reject(authErr);
+            return;
           }
-          nut.SetPassword(this.getSetting('password'), (err2) => {
-            if (err2) {
-              this.log('SetPassword error:', err2);
-            }
-            nut.GetUPSVars(device.name, (vars, err3) => {
-              if (err3) {
-                this.log('GetUPSVars error:', err3);
-                nut.close();
-                reject(err3);
-                return;
-              }
-              this.log(vars);
-              const estimatePower = this.getSetting('estimate_power');
-              const wattNominal = estimatePower === true ? this.getSetting('watt_nominal') : null;
-              const status = parseUPSStatus(vars, estimatePower, wattNominal);
-              this.log(status);
-              this.setCapabilities(status);
+
+          nut.GetUPSVars(device.name, (vars, err3) => {
+            if (err3) {
+              this.log('GetUPSVars error:', err3);
               nut.close();
-              resolve();
-            });
+              reject(err3);
+              return;
+            }
+            this.log(vars);
+            const estimatePower = this.getSetting('estimate_power');
+            const wattNominal = estimatePower === true ? this.getSetting('watt_nominal') : null;
+            const status = parseUPSStatus(vars, estimatePower, wattNominal);
+            this.log(status);
+            this.setCapabilities(status);
+            nut.close();
+            resolve();
           });
         });
       };
@@ -76,6 +75,39 @@ class UPSDevice extends Device {
       nut.on('error', onError);
       nut.start();
     });
+  }
+
+  authenticate(nut, callback) {
+    const username = String(this.getSetting('username') || '').trim();
+    const password = String(this.getSetting('password') || '').trim();
+    const hasUsername = username !== '' && username !== '-';
+    const hasPassword = password !== '' && password !== '-';
+
+    if (!hasUsername && !hasPassword) {
+      callback(null);
+      return;
+    }
+
+    if (hasUsername) {
+      nut.SetUsername(username, (usernameErr) => {
+        if (usernameErr) {
+          callback(usernameErr);
+          return;
+        }
+
+        if (!hasPassword) {
+          callback(null);
+          return;
+        }
+
+        nut.SetPassword(password, (passwordErr) => {
+          callback(passwordErr || null);
+        });
+      });
+      return;
+    }
+
+    callback('Username is required when password is provided');
   }
 
   setCapabilities(status) {

@@ -17,6 +17,9 @@
     "measure_power_factor"
   ],
   "capabilitiesOptions": {
+    "measure_power": {
+      "approximated": true
+    },
     "measure_temperature": {
       "decimals": 1,
       "title": {

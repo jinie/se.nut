@@ -46,41 +46,38 @@ class UPSDriver extends Driver {
         this.nut.on('ready', () => {
           this.log('Requesting list of active devices..');
 
-          this.nut.SetUsername(settings.username, (usernameErr) => {
-            if (usernameErr) {
-              this.log('SetUsername error:', usernameErr);
+          this.authenticate(this.nut, settings, (authErr) => {
+            if (authErr) {
+              this.log('Authentication error:', authErr);
+              this.nut.close();
+              reject(authErr);
+              return;
             }
 
-            this.nut.SetPassword(settings.password, (passwordErr) => {
-              if (passwordErr) {
-                this.log('SetPassword error:', passwordErr);
+            this.nut.GetUPSList((list, listErr) => {
+              if (listErr) {
+                this.log('GetUPSList error:', listErr);
+                this.nut.close();
+                reject(listErr);
+                return;
               }
 
-              this.nut.GetUPSList((list, listErr) => {
-                if (listErr) {
-                  this.log('GetUPSList error:', listErr);
-                  this.nut.close();
-                  reject(listErr);
-                  return;
+              this.log('Found UPS devices:', Object.keys(list));
+
+              const processDevices = async () => {
+                for (const ups of Object.keys(list)) {
+                  const device = await this.getDeviceData(ups, settings);
+                  foundDevices.push(device);
                 }
+                this.saveSettings(data);
+                this.nut.close();
+                resolve();
+              };
 
-                this.log('Found UPS devices:', Object.keys(list));
-
-                const processDevices = async () => {
-                  for (const ups of Object.keys(list)) {
-                    const device = await this.getDeviceData(ups, settings);
-                    foundDevices.push(device);
-                  }
-                  this.saveSettings(data);
-                  this.nut.close();
-                  resolve();
-                };
-
-                processDevices().catch((err) => {
-                  this.log('Error processing devices:', err);
-                  this.nut.close();
-                  reject(err);
-                });
+              processDevices().catch((err) => {
+                this.log('Error processing devices:', err);
+                this.nut.close();
+                reject(err);
               });
             });
           });
@@ -93,6 +90,39 @@ class UPSDriver extends Driver {
     session.setHandler('list_devices', async () => {
       return Promise.resolve(foundDevices);
     });
+  }
+
+  authenticate(nut, settings, callback) {
+    const username = String(settings.username || '').trim();
+    const password = String(settings.password || '').trim();
+    const hasUsername = username !== '' && username !== '-';
+    const hasPassword = password !== '' && password !== '-';
+
+    if (!hasUsername && !hasPassword) {
+      callback(null);
+      return;
+    }
+
+    if (hasUsername) {
+      nut.SetUsername(username, (usernameErr) => {
+        if (usernameErr) {
+          callback(usernameErr);
+          return;
+        }
+
+        if (!hasPassword) {
+          callback(null);
+          return;
+        }
+
+        nut.SetPassword(password, (passwordErr) => {
+          callback(passwordErr || null);
+        });
+      });
+      return;
+    }
+
+    callback('Username is required when password is provided');
   }
 
   saveSettings(data) {
